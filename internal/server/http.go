@@ -7,7 +7,7 @@ import (
 	"github.com/gorilla/mux"
 )
 
-type HttpServer struct {
+type httpServer struct {
 	Log *Log
 }
 
@@ -38,13 +38,13 @@ func NewHTTPServer(addr string) *http.Server {
 	}
 }
 
-func newHTTPServer() *HttpServer {
-	return &HttpServer{
+func newHTTPServer() *httpServer {
+	return &httpServer{
 		Log: NewLog(),
 	}
 }
 
-func (s *HttpServer) handleProduce(w http.ResponseWriter, r *http.Request) {
+func (s *httpServer) handleProduce(w http.ResponseWriter, r *http.Request) {
 	var req ProduceRequest
 	err := json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
@@ -64,7 +64,7 @@ func (s *HttpServer) handleProduce(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *HttpServer) handleConsume(w http.ResponseWriter, r *http.Request) {
+func (s *httpServer) handleConsume(w http.ResponseWriter, r *http.Request) {
 	var req ConsumeRequest
 	err := json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
