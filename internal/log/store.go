@@ -70,8 +70,30 @@ func (s *store) Read(pos uint64) ([]byte, error) {
 	}
 	// fetch the record
 	b := make([]byte, enc.Uint64(size))
-	if _, err := s.ReadAt(b, int64(pos+lenWidth)); err != nil {
+	if _, err := s.File.ReadAt(b, int64(pos+lenWidth)); err != nil {
 		return nil, err
 	}
 	return b, nil
+}
+
+// read len(p) bytes into p beginning at the given offiset
+func (s *store) ReadAt(p []byte, offset int64) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if err := s.buf.Flush(); err != nil {
+		return 0, err
+	}
+	return s.File.ReadAt(p, offset)
+}
+
+// persists any buffered data before closing the file
+func (s *store) Close() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	err := s.buf.Flush()
+	if err != nil {
+		return err
+	}
+	return s.File.Close()
+
 }
