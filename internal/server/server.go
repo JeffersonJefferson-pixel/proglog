@@ -23,8 +23,8 @@ type grpcServer struct {
 
 var _ api.LogServer = (*grpcServer)(nil)
 
-func NewGRPCServer(config *Config) (*grpc.Server, error) {
-	gSrv := grpc.NewServer()
+func NewGRPCServer(config *Config, opts ...grpc.ServerOption) (*grpc.Server, error) {
+	gSrv := grpc.NewServer(opts...)
 	srv, err := newGrpcServer(config)
 	if err != nil {
 		return nil, err
