@@ -219,6 +219,67 @@ func (l *DistributedLog) Read(offset uint64) (*api.Record, error) {
 	return l.log.Read(offset)
 }
 
+// add server to raft cluster.
+func (l *DistributedLog) Join(id, addr string) error {
+	configFuture := l.raft.GetConfiguration()
+	if err := configFuture.Error(); err != nil {
+		return err
+	}
+	serverID := raft.ServerID(id)
+	serverAddress := raft.ServerAddress(addr)
+	for _, srv := range configFuture.Configuration().Servers {
+		if srv.ID == serverID && srv.Address == serverAddress {
+			// server already joined
+			return nil
+		}
+		// remove existing server
+		removeFuture := l.raft.RemoveServer(serverID, 0, 0)
+		if err := removeFuture.Error(); err != nil {
+			return err
+		}
+	}
+	// add server as voter.
+	addFuture := l.raft.AddVoter(serverID, serverAddress, 0, 0)
+	if err := addFuture.Error(); err != nil {
+		return err
+	}
+	return nil
+}
+
+// remove server from raft cluster.
+func (l *DistributedLog) Leave(id string) error {
+	removeFuture := l.raft.RemoveServer(raft.ServerID(id), 0, 0)
+	return removeFuture.Error()
+}
+
+// blocks until the cluster has elected a leader or times out.
+func (l *DistributedLog) WaitForLeader(timeout time.Duration) error {
+	timeoutc := time.After(timeout)
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-timeoutc:
+			return fmt.Errorf("timed out")
+
+		case <-ticker.C:
+			if l := l.raft.Leader(); l != "" {
+				return nil
+			}
+		}
+
+	}
+}
+
+// shut down raft instance and closes local log.
+func (l *DistributedLog) Close() error {
+	f := l.raft.Shutdown()
+	if err := f.Error(); err != nil {
+		return err
+	}
+	return l.log.Close()
+}
+
 // raft invokes this method affer committing a log entry.
 func (l *fsm) Apply(record *raft.Log) interface{} {
 	buf := record.Data
