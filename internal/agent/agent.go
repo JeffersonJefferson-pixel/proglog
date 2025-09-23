@@ -32,7 +32,7 @@ type Config struct {
 	StartJoinAddrs []string
 	ACLModelFile   string
 	ACLPolicyFile  string
-	Boostrap       bool
+	Bootstrap      bool
 }
 
 type Agent struct {
@@ -106,7 +106,7 @@ func (a *Agent) setupLog() error {
 		if _, err := reader.Read(b); err != nil {
 			return false
 		}
-		return bytes.Compare(b, []byte{byte(log.RaftRPC)}) == 0
+		return bytes.Equal(b, []byte{byte(log.RaftRPC)})
 	})
 	logConfig := log.Config{}
 	logConfig.Raft.StreamLayer = log.NewStreamLayer(
@@ -115,7 +115,7 @@ func (a *Agent) setupLog() error {
 		a.Config.PeerTLSConfig,
 	)
 	logConfig.Raft.LocalID = raft.ServerID(a.Config.NodeName)
-	logConfig.Raft.Bootstrap = a.Config.Boostrap
+	logConfig.Raft.Bootstrap = a.Config.Bootstrap
 	var err error
 	a.log, err = log.NewDistributedLog(
 		a.Config.DataDir,
@@ -124,7 +124,7 @@ func (a *Agent) setupLog() error {
 	if err != nil {
 		return err
 	}
-	if a.Config.Boostrap {
+	if a.Config.Bootstrap {
 		err = a.log.WaitForLeader(3 * time.Second)
 	}
 

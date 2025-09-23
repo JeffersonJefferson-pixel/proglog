@@ -152,18 +152,10 @@ func (l *DistributedLog) setupRaft(dataDir string) error {
 	if err != nil {
 		return err
 	}
-	hasState, err := raft.HasExistingState(
-		logStore,
-		stableStore,
-		snapshotStore,
-	)
-	if err != nil {
-		return err
-	}
 	// bootstrap a server with itself as the only voter, amd wait until it becomes the leader.
 	// then tell the leader to add more servers to the cluster.
 	// subsequent servers don't bootstrap.
-	if l.config.Raft.Bootstrap && !hasState {
+	if l.config.Raft.Bootstrap {
 		config := raft.Configuration{
 			Servers: []raft.Server{{
 				ID:      config.LocalID,

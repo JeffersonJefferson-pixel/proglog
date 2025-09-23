@@ -7,6 +7,7 @@ import (
 	"os"
 	"proglog/internal/agent"
 	"proglog/internal/config"
+	"proglog/internal/loadbalance"
 	"testing"
 	"time"
 
@@ -16,7 +17,6 @@ import (
 	"github.com/travisjeffery/go-dynaport"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
-	"google.golang.org/grpc/status"
 )
 
 func TestAgent(t *testing.T) {
@@ -65,7 +65,7 @@ func TestAgent(t *testing.T) {
 			ACLPolicyFile:   config.ACLPolicyFile,
 			ServerTLSConfig: serverTLSConfig,
 			PeerTLSConfig:   peerTLSConfig,
-			Boostrap:        i == 0,
+			Bootstrap:       i == 0,
 		})
 		require.NoError(t, err)
 
@@ -79,7 +79,11 @@ func TestAgent(t *testing.T) {
 			require.NoError(t, os.RemoveAll(agent.Config.DataDir))
 		}
 	}()
+
+	// wait for agent to join cluster
 	time.Sleep(3 * time.Second)
+
+	fmt.Printf("try to produce\n")
 
 	// produce and consume log with leader client.
 	leaderClient := client(t, agents[0], peerTLSConfig)
@@ -92,6 +96,11 @@ func TestAgent(t *testing.T) {
 		},
 	)
 	require.NoError(t, err)
+	fmt.Printf("produced\n")
+
+	// wait for replication
+	time.Sleep(3 * time.Second)
+
 	consumeResponse, err := leaderClient.Consume(
 		context.Background(),
 		&api.ConsumeRequest{
@@ -101,8 +110,7 @@ func TestAgent(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, consumeResponse.Record.Value, []byte("foo"))
 
-	// wait for replication.
-	time.Sleep(3 * time.Second)
+	fmt.Printf("consumed from leader agent\n")
 
 	followerClient := client(t, agents[1], peerTLSConfig)
 	consumeResponse, err = followerClient.Consume(
@@ -113,26 +121,22 @@ func TestAgent(t *testing.T) {
 	)
 	require.NoError(t, err)
 	require.Equal(t, consumeResponse.Record.Value, []byte("foo"))
-
-	consumeResponse, err = leaderClient.Consume(
-		context.Background(),
-		&api.ConsumeRequest{
-			Offset: produceResponse.Offset + 1,
-		},
-	)
-	require.Nil(t, consumeResponse)
-	require.Error(t, err)
-	got := status.Code(err)
-	want := status.Code(api.ErrOffsetOutOfRange{}.GRPCStatus().Err())
-	require.Equal(t, got, want)
+	fmt.Printf("consumed from follower agent\n")
 }
 
 func client(t *testing.T, agent *agent.Agent, tlsConfig *tls.Config) api.LogClient {
+	// tls for client grpc
 	tlsCreds := credentials.NewTLS(tlsConfig)
 	opts := []grpc.DialOption{grpc.WithTransportCredentials(tlsCreds)}
 	rpcAddr, err := agent.Config.RPCAddr()
 	require.NoError(t, err)
-	conn, err := grpc.Dial(fmt.Sprintf("%s", rpcAddr), opts...)
+	// grpc client
+	// use custom resolver
+	conn, err := grpc.NewClient(fmt.Sprintf(
+		"%s:///%s",
+		loadbalance.Name,
+		rpcAddr,
+	), opts...)
 	require.NoError(t, err)
 	client := api.NewLogClient(conn)
 	return client

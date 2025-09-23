@@ -35,9 +35,11 @@ func (p *Picker) Build(buildInfo base.PickerBuildInfo) balancer.Picker {
 	return p
 }
 
+var _ balancer.Picker = (*Picker)(nil)
+
 func (p *Picker) Pick(info balancer.PickInfo) (balancer.PickResult, error) {
 	p.mu.RLock()
-	defer p.mu.RLock()
+	defer p.mu.RUnlock()
 	var result balancer.PickResult
 	// route produce rpc to leader and consume to followers
 	if strings.Contains(info.FullMethodName, "Produce") || len(p.followers) == 0 {

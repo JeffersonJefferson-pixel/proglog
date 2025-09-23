@@ -45,6 +45,12 @@ func (r *Resolver) Build(target resolver.Target, cc resolver.ClientConn, opts re
 	return r, nil
 }
 
+func init() {
+	resolver.Register(&Resolver{})
+}
+
+var _ resolver.Resolver = (*Resolver)(nil)
+
 // resolve target, discover server, update client connection with server.
 func (r *Resolver) ResolveNow(resolver.ResolveNowOptions) {
 	r.mu.Lock()
@@ -88,8 +94,4 @@ func (r *Resolver) Close() {
 
 func (r *Resolver) Scheme() string {
 	return Name
-}
-
-func init() {
-	resolver.Register(&Resolver{})
 }
