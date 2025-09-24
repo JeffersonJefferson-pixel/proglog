@@ -24,6 +24,9 @@ import (
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/peer"
 	"google.golang.org/grpc/status"
+
+	"google.golang.org/grpc/health"
+	healthpb "google.golang.org/grpc/health/grpc_health_v1"
 )
 
 type CommitLog interface {
@@ -98,6 +101,12 @@ func NewGRPCServer(config *Config, opts ...grpc.ServerOption) (*grpc.Server, err
 	)
 
 	gSrv := grpc.NewServer(opts...)
+
+	// create health service
+	hSrv := health.NewServer()
+	hSrv.SetServingStatus("", healthpb.HealthCheckResponse_SERVING)
+	healthpb.RegisterHealthServer(gSrv, hSrv)
+
 	srv, err := newGrpcServer(config)
 	if err != nil {
 		return nil, err
